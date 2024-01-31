@@ -1,0 +1,22 @@
+{
+    "name": "laucov/files",
+    "description": "Library for file manipulation.",
+    "type": "library",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Laucov\\Files\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Rafael Covaleski",
+            "email": "covaleski23@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "laravel/pint": "^1.13"
+    }
+}
