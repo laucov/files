@@ -44,13 +44,31 @@ final class StringSourceTest extends TestCase
 
     private StringSource $sourceC;
 
-    private string $text;
+    private string $text = 'The quick brown fox jumps over the lazy dog.';
+
+    public function instanceProvider(): array
+    {
+        return [
+            // Test with string.
+            [
+                $this->text,
+                new StringSource($this->text),
+            ],
+            // Test with file.
+            [
+                file_get_contents(__FILE__),
+                new StringSource(fopen(__FILE__, 'r')),
+            ],
+            // Test with data:// file pointer.
+            [
+                $this->text,
+                new StringSource(fopen('data://text/plain,' . $this->text, 'r')),
+            ],
+        ];
+    }
 
     protected function setUp(): void
     {
-        // Create text.
-        $this->text = 'The quick brown fox jumps over the lazy dog.';
-
         // Get source from string.
         $this->sourceA = new StringSource($this->text);
         // Get source from custom resource.
@@ -66,43 +84,27 @@ final class StringSourceTest extends TestCase
      * @covers ::seek
      * @covers ::tell
      * @uses Laucov\Files\Resource\StringSource::__construct
+     * @dataProvider instanceProvider
      */
-    public function testCanRead(): void
-    {
-        // Set file resource expected data.
-        $contents = file_get_contents(__FILE__);
-        $filesize = filesize(__FILE__);
-
+    public function testCanRead(
+        string $expected_content,
+        StringSource $source,
+    ): void {
         // Get size.
-        $size_a = $this->sourceA->getSize();
-        $size_b = $this->sourceB->getSize();
-        $size_c = $this->sourceC->getSize();
-        $this->assertSame(44, $size_a);
-        $this->assertSame(44, $size_b);
-        $this->assertSame($filesize, $size_c);
+        $expected_size = strlen($expected_content);
+        $size = $source->getSize();
+        $this->assertSame($expected_size, $size);
 
         // Read all content.
-        $this->assertSame($this->text, $this->sourceA->read($size_a));
-        $this->assertSame($this->text, $this->sourceB->read($size_b));
-        $this->assertSame($contents, $this->sourceC->read($size_c));
-
+        $this->assertSame($expected_content, $source->read($size));
         // Try reading after EOF.
-        $this->assertSame('', $this->sourceA->read($size_a));
-        $this->assertSame('', $this->sourceB->read($size_b));
-        $this->assertSame('', $this->sourceC->read($size_c));
-
+        $this->assertSame('', $source->read(128));
         // Ensure pointer is at EOF.
-        $this->assertSame(44, $this->sourceA->tell());
-        $this->assertSame(44, $this->sourceB->tell());
-        $this->assertSame($filesize, $this->sourceC->tell());
+        $this->assertSame($expected_size, $source->tell());
 
         // Move pointer.
-        $this->sourceA->seek(0);
-        $this->sourceB->seek(0);
-        $this->sourceC->seek(0);
-        $this->assertSame(0, $this->sourceA->tell());
-        $this->assertSame(0, $this->sourceB->tell());
-        $this->assertSame(0, $this->sourceC->tell());
+        $source->seek(0);
+        $this->assertSame(0, $source->tell());
     }
 
     /**
@@ -112,12 +114,15 @@ final class StringSourceTest extends TestCase
      * @uses Laucov\Files\Resource\StringSource::read
      * @uses Laucov\Files\Resource\StringSource::seek
      * @uses Laucov\Files\Resource\StringSource::tell
+     * @dataProvider instanceProvider
      */
-    public function testCanUseAsString(): void
-    {
-        $this->assertSame($this->text, "{$this->sourceA}");
-        $this->assertSame($this->text, "{$this->sourceB}");
-        $this->assertSame(file_get_contents(__FILE__), "{$this->sourceC}");
+    public function testCanUseAsString(
+        string $expected_content,
+        StringSource $source,
+    ): void {
+        $this->assertSame($expected_content, strval($source));
+        $this->assertSame($expected_content, (string) $source);
+        $this->assertSame($expected_content, "{$source}");
     }
 
     /**
