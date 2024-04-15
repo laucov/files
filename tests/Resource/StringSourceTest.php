@@ -64,7 +64,22 @@ final class StringSourceTest extends TestCase
                 $this->text,
                 new StringSource(fopen('data://text/plain,' . $this->text, 'r')),
             ],
+            // Test with php:// file pointer.
+            [
+                '',
+                new StringSource(fopen('php://input', 'r')),
+            ],
         ];
+    }
+
+    public function invalidReadLengthProvider(): array
+    {
+        return [[-16], [-1], [0]];
+    }
+
+    public function invalidRewindOffsetProvider(): array
+    {
+        return [[-1], [-16]];
     }
 
     protected function setUp(): void
@@ -79,9 +94,8 @@ final class StringSourceTest extends TestCase
     }
 
     /**
-     * @covers ::getSize
      * @covers ::read
-     * @covers ::seek
+     * @covers ::rewind
      * @covers ::tell
      * @uses Laucov\Files\Resource\StringSource::__construct
      * @dataProvider instanceProvider
@@ -92,19 +106,23 @@ final class StringSourceTest extends TestCase
     ): void {
         // Get size.
         $expected_size = strlen($expected_content);
-        $size = $source->getSize();
-        $this->assertSame($expected_size, $size);
 
         // Read all content.
-        $this->assertSame($expected_content, $source->read($size));
+        $length = max($expected_size, 1);
+        $this->assertSame($expected_content, $source->read($length));
+        $this->assertSame($expected_size, $source->tell());
         // Try reading after EOF.
         $this->assertSame('', $source->read(128));
-        // Ensure pointer is at EOF.
         $this->assertSame($expected_size, $source->tell());
 
-        // Move pointer.
-        $source->seek(0);
+        // Rewind pointer.
+        $source->rewind();
         $this->assertSame(0, $source->tell());
+
+        // Read partial content.
+        $this->assertSame(substr($expected_content, 0, 16), $source->read(16));
+        $source->rewind(8);
+        $this->assertSame(substr($expected_content, 8, 8), $source->read(8));
     }
 
     /**
@@ -112,7 +130,7 @@ final class StringSourceTest extends TestCase
      * @uses Laucov\Files\Resource\StringSource::__construct
      * @uses Laucov\Files\Resource\StringSource::getSize
      * @uses Laucov\Files\Resource\StringSource::read
-     * @uses Laucov\Files\Resource\StringSource::seek
+     * @uses Laucov\Files\Resource\StringSource::rewind
      * @uses Laucov\Files\Resource\StringSource::tell
      * @dataProvider instanceProvider
      */
@@ -137,12 +155,23 @@ final class StringSourceTest extends TestCase
     /**
      * @covers ::read
      * @uses Laucov\Files\Resource\StringSource::__construct
+     * @dataProvider invalidReadLengthProvider
      */
-    public function testMustReadPositiveLenghts(): void
+    public function testMustReadPositiveLenghts(int $length): void
     {
-        // Test using negative positions.
         $this->expectException(\InvalidArgumentException::class);
-        $this->sourceA->read(-1);
+        $this->sourceA->read($length);
+    }
+
+    /**
+     * @covers ::rewind
+     * @uses Laucov\Files\Resource\StringSource::__construct
+     * @dataProvider invalidRewindOffsetProvider
+     */
+    public function testMustRewindValidOffset(int $offset): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->sourceA->rewind($offset);
     }
 
     /**

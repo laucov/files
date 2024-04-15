@@ -87,17 +87,20 @@ class StringSource
 
         // Remember and reset the pointer's position.
         $position = $this->tell();
-        $this->seek(0);
+        $this->rewind();
 
         // Read all the content and load back the pointer's position.
-        $string = $this->read($this->getSize());
-        $this->seek($position);
+        $string = stream_get_contents($this->resource);
+        $this->rewind($this->tell() - $position);
 
         return $string;
     }
 
     /**
      * Get the source size in bytes.
+     * 
+     * @deprecated 2.0.0 Misleading with resources such as "php://input".
+     * @codeCoverageIgnore
      */
     public function getSize(): int
     {
@@ -106,7 +109,7 @@ class StringSource
             $stat = fstat($this->resource);
             // @codeCoverageIgnoreStart
             if (!is_array($stat)) {
-                $message = 'Could not collect the resource information.';
+                $message = 'Could not get the resource file information.';
                 throw new \RuntimeException($message);
             }
             $size = $stat['size'] ?? null;
@@ -130,7 +133,7 @@ class StringSource
     public function read(int $length): string
     {
         // Check position value.
-        if ($length < 0) {
+        if ($length <= 0) {
             $message = 'Length must be a positive number.';
             throw new \InvalidArgumentException($message);
         }
@@ -155,7 +158,41 @@ class StringSource
     }
 
     /**
+     * Rewind the content pointer.
+     */
+    public function rewind(null|int $offset = null): void
+    {
+        // Check offset value.
+        if ($offset < 0) {
+            $message = 'Offset must be a positive number.';
+            throw new \InvalidArgumentException($message);
+        }
+
+        // Calculate the new offset.
+        $position = $offset === null ? 0 : max($this->tell() - $offset, 0);
+
+        // Move the resource file pointer.
+        if ($this->isResource) {
+            $result = fseek($this->resource, $position, SEEK_SET);
+            // @codeCoverageIgnoreStart
+            if ($result !== 0) {
+                $message = 'Could not move the resource file pointer.';
+                throw new \RuntimeException($message);
+            }
+            // @codeCoverageIgnoreEnd
+        } else {
+            // Set the string offset.
+            $this->offset = $position;
+        }
+
+        
+    }
+
+    /**
      * Move the content pointer to the designated position.
+     * 
+     * @deprecated 2.0.0 Misleading with resources such as "php://input".
+     * @codeCoverageIgnore
      */
     public function seek(int $position): void
     {
